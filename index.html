@@ -1,0 +1,1649 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Companion Simulator — Interactive Web Edition</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-main: #1E1B2E;
+      --bg-panel: #2A2540;
+      --bg-btn: #312B4B;
+      --accent: #FF5E99;
+      --portrait: #FF8DC7;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-main);
+      color: #F4F1FA;
+      transition: background-color 0.35s ease;
+      overflow-x: hidden;
+    }
+    .mono-font {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .theme-panel {
+      background-color: var(--bg-panel);
+      transition: background-color 0.35s ease, border-color 0.35s ease;
+    }
+    .theme-btn {
+      background-color: var(--bg-btn);
+      transition: background-color 0.2s ease, transform 0.1s ease;
+    }
+    .theme-btn:hover:not(:disabled) {
+      filter: brightness(1.18);
+    }
+    .theme-btn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+    .theme-accent-bg {
+      background-color: var(--accent);
+    }
+    .theme-accent-text {
+      color: var(--accent);
+    }
+    .theme-portrait-text {
+      color: var(--portrait);
+    }
+    .chat-scroll::-webkit-scrollbar {
+      width: 8px;
+    }
+    .chat-scroll::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+    .chat-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+    .chat-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.35);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-2 sm:p-4 select-none">
+
+  <!-- Top Header HUD (Matches Desktop GUI Layout & Mood Themes) -->
+  <header class="w-full max-w-6xl mx-auto theme-panel rounded-xl border border-white/10 p-3 sm:p-4 shadow-lg">
+    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+      <!-- Left: ASCII + SVG Mood Portrait & Status Summary -->
+      <div class="flex items-center gap-3 sm:gap-4 w-full md:w-auto">
+        <div class="bg-black/35 border border-white/10 rounded-lg px-3 py-2 flex items-center justify-center min-w-[118px]">
+          <pre id="hudPortrait" class="mono-font text-xs sm:text-sm leading-tight theme-portrait-text font-semibold select-text"></pre>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm font-semibold">
+            <span id="hudTitle" class="text-white text-sm sm:text-base font-bold">sakura (Close Partners)</span>
+            <span class="text-white/40">|</span>
+            <span>Mood: <strong id="hudMood" class="theme-portrait-text">Happy</strong></span>
+            <span class="text-white/40">|</span>
+            <span>Vibe: <strong id="hudVibe" class="text-pink-200">Sweet &amp; Caring</strong></span>
+            <span class="text-white/40">|</span>
+            <button id="btnOpenApiModal" type="button" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-black/30 border border-white/15 hover:border-white/40 transition" title="Click to configure Online API / Public Server Mode">
+              <span id="hudConnDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span id="hudConnLabel">Hybrid Smart Engine (Ready)</span>
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-300 mt-1">
+            <span>Day <strong id="hudDay" class="text-white">1</strong></span>
+            <span class="text-white/30">|</span>
+            <span>Energy: <strong id="hudEnergy" class="text-amber-300">3/3</strong></span>
+            <span class="text-white/30">|</span>
+            <span>Coins: <strong id="hudCoins" class="text-yellow-300">50</strong></span>
+            <span class="text-white/30">|</span>
+            <span>Keepsakes: <strong id="hudKeepsakes" class="text-purple-300">1/4</strong></span>
+            <span class="text-white/30">|</span>
+            <span>Memories: <strong id="hudMemories" class="text-cyan-300">0</strong></span>
+            <span class="text-white/30">|</span>
+            <span>Chime: <strong id="hudChime" class="text-emerald-300">ON</strong></span>
+          </div>
+
+          <!-- Affection Progress Bar -->
+          <div class="mt-2 flex items-center gap-2.5">
+            <div class="w-44 sm:w-64 h-3 bg-black/40 rounded-full overflow-hidden border border-white/15 p-0.5">
+              <div id="hudAffectionBar" class="h-full rounded-full theme-accent-bg transition-all duration-300" style="width: 65%;"></div>
+            </div>
+            <span id="hudAffectionText" class="text-xs font-semibold text-emerald-300">Affection: 65/100</span>
+            <span id="hudTopicBadge" class="hidden sm:inline-block text-[11px] px-2 py-0.5 rounded bg-white/10 text-slate-200">Topic: General</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Public Site / API / Deploy Quick Controls -->
+      <div class="flex items-center gap-2 self-end md:self-center">
+        <button id="btnOpenDeployModal" type="button" class="theme-btn text-xs font-medium px-3 py-1.5 rounded-lg border border-white/15 text-cyan-200 flex items-center gap-1.5">
+          <span>🌐 Public Site &amp; API Setup</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Chat Log Area -->
+  <main class="w-full max-w-6xl mx-auto flex-1 flex flex-col my-2.5 min-h-0">
+    <div id="chatLog" class="chat-scroll flex-1 bg-[#141220] border border-white/15 rounded-xl p-3 sm:p-4 overflow-y-auto space-y-2.5 h-[52vh] sm:h-[56vh] select-text mono-font text-xs sm:text-sm">
+      <!-- Populated dynamically by JS -->
+    </div>
+
+    <!-- Typing Indicator & Input Row -->
+    <div class="mt-2.5 flex flex-col gap-1.5">
+      <div id="typingIndicator" class="hidden text-xs italic text-pink-300 px-2 flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-pink-400 animate-ping"></span>
+        <span id="typingText">sakura is typing...</span>
+      </div>
+
+      <form id="chatForm" class="flex items-center gap-2">
+        <input
+          id="chatInput"
+          type="text"
+          autocomplete="off"
+          placeholder="Type anything here to chat non-stop (0 Energy)... e.g. 'My favorite music is Malayalam songs' or 'What is Python?'"
+          class="flex-1 bg-[#181526] text-white placeholder-slate-400 text-xs sm:text-sm px-3.5 py-2.5 rounded-xl border border-white/15 focus:outline-none focus:border-pink-400 transition select-text"
+        />
+        <button
+          id="btnSendChat"
+          type="submit"
+          class="theme-accent-bg hover:opacity-95 active:scale-95 text-white font-semibold text-xs sm:text-sm px-4 sm:px-5 py-2.5 rounded-xl shadow transition"
+        >
+          Send Chat
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <!-- Bottom 2x7 Action Button Grid (Preserves All Desktop GUI Features) -->
+  <footer class="w-full max-w-6xl mx-auto theme-panel rounded-xl border border-white/10 p-2.5 shadow-lg">
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 text-xs font-medium">
+      <button id="btnActStory" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-white">Story (1⚡)</button>
+      <button id="btnActCompliment" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-white">Compliment (1⚡)</button>
+      <button id="btnActGift" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-white">Gift (1⚡)</button>
+      <button id="btnActShop" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-white">Shop</button>
+      <button id="btnActDate" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-white">Date (1⚡)</button>
+      <button id="btnActMinigame" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-white">Mini-Game (1⚡)</button>
+      <button id="btnActRest" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-amber-200">Rest (Next Day)</button>
+
+      <button id="btnActMemories" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-cyan-200">Memory Box</button>
+      <button id="btnActVibe" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-pink-200">Vibe</button>
+      <button id="btnActChime" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-emerald-200">Chime</button>
+      <button id="btnActDiary" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-purple-200">Export Diary</button>
+      <button id="btnActProfile" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-white">Profile</button>
+      <button id="btnActHelp" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-white/10 text-slate-200">Help</button>
+      <button id="btnActReset" type="button" class="theme-btn py-2 px-2.5 rounded-lg border border-rose-500/30 text-rose-300">Reset Save</button>
+    </div>
+  </footer>
+
+  <!-- Universal Modal Container -->
+  <div id="modalOverlay" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="theme-panel border border-white/20 rounded-2xl max-w-lg w-full p-4 sm:p-5 shadow-2xl max-h-[88vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3">
+        <h3 id="modalTitle" class="text-base sm:text-lg font-bold text-white">Modal Title</h3>
+        <button id="btnCloseModal" type="button" class="text-slate-400 hover:text-white text-sm px-2 py-1 rounded-lg bg-white/5">✕</button>
+      </div>
+      <div id="modalBody" class="overflow-y-auto space-y-3 text-xs sm:text-sm text-slate-200 flex-1 pr-1 select-text">
+        <!-- Dynamic modal content -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Banner -->
+  <div id="toastBanner" class="fixed bottom-5 right-5 z-50 hidden bg-slate-900/95 border border-pink-400/50 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-xl"></div>
+
+  <script>
+    // =========================================================================
+    // 1. CORE CONSTANTS, MOOD THEMES, PORTRAITS & KNOWLEDGE BASE
+    // =========================================================================
+    const STORAGE_KEY_STATE = "companion_sim_web_state_v1";
+    const STORAGE_KEY_API = "companion_sim_web_api_v1";
+    const DEFAULT_HISTORY_LIMIT = 10;
+
+    const PERSONALITIES = {
+      "Sweet & Caring": "warm, gentle, encouraging, and deeply affectionate",
+      "Playful & Teasing": "witty, cheeky, spirited, playful, and full of banter",
+      "Poetic & Romantic": "dreamy, lyrical, artistic, and deeply romantic"
+    };
+
+    const GIFT_CATALOG = {
+      "Matcha Latte": { price: 15, bonus: 8, mood: "Happy", desc: "A warm, frothy ceremonial matcha latte." },
+      "Vinyl Keychain": { price: 25, bonus: 12, mood: "Excited", desc: "A retro mini vinyl record keychain." },
+      "Handwritten Note": { price: 30, bonus: 14, mood: "Touched", desc: "A heartfelt letter written just for her." },
+      "Starlight Bouquet": { price: 50, bonus: 18, mood: "Blushing", desc: "Glowing evening flowers wrapped in ribbon." }
+    };
+
+    const MOOD_THEMES = {
+      "Happy":    { bg: "#1E1B2E", panel: "#2A2540", btn: "#312B4B", accent: "#FF5E99", portrait: "#FF8DC7" },
+      "Blushing": { bg: "#2B1829", panel: "#3D213A", btn: "#4A2847", accent: "#FF4785", portrait: "#FFA6C9" },
+      "Excited":  { bg: "#1C2133", panel: "#262E47", btn: "#2F3959", accent: "#FFB830", portrait: "#FFE07D" },
+      "Touched":  { bg: "#241B30", panel: "#332645", btn: "#3E2E54", accent: "#C77DFF", portrait: "#E0AAFF" },
+      "Caring":   { bg: "#172629", panel: "#20353A", btn: "#28434A", accent: "#4ECDC4", portrait: "#7EF2B5" },
+      "Curious":  { bg: "#1A2233", panel: "#232F47", btn: "#2C3B59", accent: "#56CFE1", portrait: "#7CE8FF" },
+      "Hurt":     { bg: "#1E2029", panel: "#292C38", btn: "#343847", accent: "#8D99AE", portrait: "#B8C0CC" }
+    };
+
+    const MOOD_PORTRAITS = {
+      "Happy":    "  .---.  \n / ^ ^ \\ \n| (‿)  | <3\n \\_____/ ",
+      "Blushing": "  .---.  \n / > < \\ \n| (o_o) | *blush*\n \\_____/ ",
+      "Excited":  "  .---.  \n / ★ ★ \\ \n|  \\▽/  | !!\n \\_____/ ",
+      "Touched":  "  .---.  \n / ◕ ◕ \\ \n|  (◡)  | ♡\n \\_____/ ",
+      "Caring":   "  .---.  \n / ˘ ˘ \\ \n|  (‿)  | ~♪\n \\_____/ ",
+      "Curious":  "  .---.  \n / o O \\ \n|  (·)  | ?\n \\_____/ ",
+      "Hurt":     "  .---.  \n / ; ; \\ \n|  (︵) | ...\n \\_____/ "
+    };
+
+    const KNOWLEDGE_BASE = {
+      "python": {
+        aliases: ["python", "py"],
+        is_technical: true,
+        definition: "Python is a high-level programming language! It's beginner-friendly, clean to read, and super powerful.",
+        why_popular: "Because its readable syntax and massive ecosystem make it ideal for AI, web backends, data science, and automation!",
+        how_used: "Python powers web servers, automation scripts, machine learning models, data analysis, and desktop apps!",
+        extra: "Python was created by Guido van Rossum in 1991."
+      },
+      "java": {
+        aliases: ["java", "jvm"],
+        is_technical: true,
+        definition: "Java is a widely used, object-oriented programming language designed to run across platforms via the JVM!",
+        why_popular: "Because of its 'write once, run anywhere' portability, strong type safety, and enterprise ecosystem!",
+        how_used: "Java compiles into bytecode for the JVM, powering backend services, Android apps, and DSA coursework!"
+      },
+      "c++": {
+        aliases: ["c++", "cpp"],
+        is_technical: true,
+        definition: "C++ is a high-performance compiled language extending C with object-oriented and generic programming features!",
+        why_popular: "Because it gives fine-grained hardware and memory control at native execution speeds!",
+        how_used: "C++ is used for game engines, embedded firmware, operating systems, and competitive programming."
+      },
+      "javascript": {
+        aliases: ["javascript", "js", "nodejs", "typescript"],
+        is_technical: true,
+        definition: "JavaScript is the programming language of the web! It powers interactive browser UIs and Node.js servers.",
+        why_popular: "Because it runs natively in every browser and lets you build full-stack web apps in a single language!",
+        how_used: "JavaScript updates the DOM, handles async events, and powers frameworks like React, Vue, and Express."
+      },
+      "recursion": {
+        aliases: ["recursion", "recursive"],
+        is_technical: true,
+        definition: "Recursion is a programming technique where a function calls itself on smaller inputs until it reaches a base case!",
+        why_popular: "Because it expresses tree traversals, divide-and-conquer algorithms (like Merge Sort), and recurrence relations cleanly!",
+        how_used: "Every recursive function needs a base case to stop and a recursive step that moves closer to that base case."
+      },
+      "binary search": {
+        aliases: ["binary search", "bst", "binary search tree"],
+        is_technical: true,
+        definition: "Binary search finds a target in a sorted array by repeatedly halving the search interval in O(log n) time!",
+        why_popular: "Because halving the search space each step is exponentially faster than linear O(n) scanning!",
+        how_used: "It compares the target with the middle element and eliminates the half where the target cannot lie."
+      },
+      "differential equations": {
+        aliases: ["differential equation", "differential equations", "pde", "ode", "laplace", "fourier", "wave equation", "heat equation"],
+        is_technical: true,
+        definition: "A differential equation relates a function to its derivatives, modeling how physical quantities change over space and time!",
+        why_popular: "Because they describe heat conduction, wave propagation, electrodynamics, and control systems!",
+        how_used: "Methods like separation of variables, D'Alembert's formula, and Fourier series solve boundary-value PDE problems step by step."
+      },
+      "gravity": {
+        aliases: ["gravity", "gravitational"],
+        is_technical: false,
+        definition: "Gravity is the fundamental force of attraction between all objects with mass or energy!",
+        why_popular: "Because it keeps planets in orbit, holds galaxies together, and gives weight to objects on Earth (g ≈ 9.81 m/s²)!",
+        how_used: "Newton modeled it as an inverse-square force, while Einstein explained it as the curvature of spacetime."
+      },
+      "dna": {
+        aliases: ["dna", "genetics", "genome"],
+        is_technical: false,
+        definition: "DNA is the double-helix molecule that encodes the genetic blueprint for living organisms!",
+        why_popular: "Because its base pairs (A-T and C-G) store hereditary instructions across generations!",
+        how_used: "DNA sequences are transcribed into RNA and translated into the proteins that build cells."
+      }
+    };
+
+    const STOP_WORDS = new Set([
+      "hi", "hello", "hey", "yo", "sup", "morning", "evening", "goodnight", "night",
+      "darling", "babe", "baby", "honey", "sweetheart", "dear", "love", "cutie",
+      "you", "your", "yours", "yourself", "we", "us", "our",
+      "what", "why", "how", "when", "where", "who", "which",
+      "did", "do", "does", "done", "are", "is", "was", "were", "have", "had", "has",
+      "will", "would", "can", "could", "should", "shall",
+      "yes", "yeah", "yep", "no", "nope", "nah", "maybe", "idk", "nothing", "none",
+      "ok", "okay", "sure", "fine", "thanks", "thank", "please", "sorry",
+      "want", "wanted", "wants", "else", "with", "much", "very", "really", "just",
+      "always", "never", "still", "even", "also", "then", "than", "that", "this",
+      "them", "they", "their", "there", "here", "from", "into", "onto", "about",
+      "over", "under", "again", "already", "something", "anything", "everything",
+      "recently", "lately", "soon", "probably", "actually", "honestly", "seeing",
+      "talking", "saying", "thinking", "feeling", "looking", "going", "need", "like"
+    ]);
+
+    // =========================================================================
+    // 2. APPLICATION STATE & PERSISTENCE (localStorage + SQLite Schema Parity)
+    // =========================================================================
+    function createDefaultState() {
+      return {
+        player_name: "sasuke",
+        partner_name: "sakura",
+        personality: "Sweet & Caring",
+        affection: 65,
+        mood: "Happy",
+        day: 1,
+        energy: 3,
+        coins: 50,
+        chime_enabled: true,
+        inventory: ["Matcha Latte"],
+        keepsakes: [
+          {
+            title: "First Spark (60+ Affection)",
+            description: "A pressed flower tucked into your notebook when you became Close Partners."
+          }
+        ],
+        memories: {},
+        memory_records: [],
+        chat_history: [],
+        last_topic: null,
+        recent_topics: [],
+        last_user_emotion: "Neutral",
+        pending_key: "favorite_food",
+        pending_label: "favorite food",
+        turn_count: 0
+      };
+    }
+
+    let state = createDefaultState();
+    let apiConfig = {
+      provider: "auto", // "auto", "gemini", "openai", "custom_backend"
+      geminiKey: "",
+      geminiModel: "gemini-3.5-flash-lite",
+      openaiKey: "",
+      openaiModel: "gpt-4o-mini",
+      backendUrl: "",
+      lastStatusMode: "Online",
+      lastStatusLabel: "Hybrid Smart Engine (Ready)"
+    };
+
+    function loadStateFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_STATE);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          state = Object.assign(createDefaultState(), parsed);
+        }
+        const rawApi = localStorage.getItem(STORAGE_KEY_API);
+        if (rawApi) {
+          apiConfig = Object.assign(apiConfig, JSON.parse(rawApi));
+        }
+      } catch (e) {
+        // Fallback to in-memory state in restricted environments
+      }
+      refreshConnectionBadge();
+    }
+
+    function saveStateToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify(state));
+        localStorage.setItem(STORAGE_KEY_API, JSON.stringify(apiConfig));
+      } catch (e) {
+        // Ignore storage quota errors in sandboxed preview
+      }
+    }
+
+    // =========================================================================
+    // 3. WEB AUDIO SYNTHESIZED CHIME & UI HELPERS
+    // =========================================================================
+    let audioCtx = null;
+    function playChime(type = "chat") {
+      if (!state.chime_enabled) return;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        if (!audioCtx) audioCtx = new AudioContextClass();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+        if (type === "reward") {
+          osc.frequency.setValueAtTime(587.33, now);
+          osc.frequency.setValueAtTime(880, now + 0.08);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+          osc.start(now);
+          osc.stop(now + 0.24);
+        } else {
+          osc.frequency.setValueAtTime(659.25, now);
+          osc.frequency.setValueAtTime(783.99, now + 0.06);
+          gain.gain.setValueAtTime(0.05, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        }
+      } catch (e) {
+        // Ignore audio errors before user gesture
+      }
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById("toastBanner");
+      el.textContent = msg;
+      el.classList.remove("hidden");
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        el.classList.add("hidden");
+      }, 3200);
+    }
+
+    function getRelationshipTier(affection) {
+      if (affection >= 80) return "Soulmates";
+      if (affection >= 60) return "Close Partners";
+      if (affection >= 35) return "Getting Closer";
+      return "Distant";
+    }
+
+    function clampAffection(val) {
+      return Math.max(0, Math.min(100, Math.round(val)));
+    }
+
+    function checkMilestones() {
+      const unlockedTitles = new Set((state.keepsakes || []).map(k => k.title));
+      const milestones = [
+        {
+          cond: state.affection >= 60,
+          title: "First Spark (60+ Affection)",
+          description: `A pressed flower ${state.partner_name} tucked into ${state.player_name}'s notebook when you became Close Partners.`
+        },
+        {
+          cond: Object.keys(state.memories || {}).length >= 3,
+          title: "Heart to Heart (3+ Memories)",
+          description: `A handwritten list of ${state.player_name}'s favorite things that ${state.partner_name} keeps by her desk.`
+        },
+        {
+          cond: state.day >= 7,
+          title: "One Week Anniversary (Day 7+)",
+          description: `Two cinema stubs and a photo strip from your first full week together.`
+        },
+        {
+          cond: state.affection >= 85,
+          title: "Soulmate Promise (85+ Affection)",
+          description: `A matching pair of starlight bracelets symbolizing your unbreakable bond.`
+        }
+      ];
+
+      milestones.forEach(m => {
+        if (m.cond && !unlockedTitles.has(m.title)) {
+          state.keepsakes.push({ title: m.title, description: m.description });
+          appendSystemLine(`★ NEW KEEPSAKE UNLOCKED: ${m.title} — ${m.description}`, "text-amber-300 font-semibold");
+          playChime("reward");
+        }
+      });
+    }
+
+    // =========================================================================
+    // 4. PERSISTENT MEMORY & NLU / EMOTION / CONVERSATION ENGINE
+    // =========================================================================
+    function upsertMemory(key, category, fact, rawValue) {
+      const cleanKey = key.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+      const cleanVal = String(rawValue).trim().replace(/[.!?]+$/, "");
+      if (!cleanVal || cleanVal.length < 2) return;
+
+      state.memories[cleanKey] = cleanVal;
+      if (["favorite_music", "favorite_songs", "favorite_music_genre", "favorite_genre"].includes(cleanKey)) {
+        state.memories["favorite_song"] = cleanVal;
+        state.memories["favorite_music"] = cleanVal;
+      }
+
+      const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+      const existingIdx = state.memory_records.findIndex(r => r.memory_key === cleanKey);
+      const record = {
+        memory_key: cleanKey,
+        category: category,
+        fact: fact,
+        raw_value: cleanVal,
+        updated_at: now
+      };
+      if (existingIdx >= 0) {
+        state.memory_records[existingIdx] = record;
+      } else {
+        state.memory_records.unshift(record);
+      }
+      checkMilestones();
+      saveStateToStorage();
+    }
+
+    function extractPersonalFact(userMsg) {
+      if (!userMsg || userMsg.includes("?")) return null;
+      let clean = userMsg.trim().replace(/[.!?]+$/, "");
+      clean = clean.replace(/^(?:actually|correction|update|no|wait|sorry|honestly|by the way|btw)[,:\s]+/i, "").trim();
+      clean = clean.replace(/\s+(?:now|instead|these days)$/i, "").trim();
+
+      let m = clean.match(/\bremember\s+that\s+(.+)/i);
+      if (m) {
+        const val = m[1].trim();
+        const noteKey = `note_${Object.keys(state.memories).filter(k => k.startsWith("note_")).length + 1}`;
+        upsertMemory(noteKey, "Important experiences", `User shared: ${val}.`, val);
+        return { label: "personal note", val };
+      }
+
+      m = clean.match(/\bmy\s+fav(?:ou?rite)?\s+([a-zA-Z\s]{2,22}?)\s+(?:is|are)\s+(.+)/i);
+      if (m) {
+        const catRaw = m[1].trim().toLowerCase();
+        const val = m[2].trim();
+        const key = `favorite_${catRaw.replace(/\s+/g, "_")}`;
+        let cat = "Personal preferences";
+        if (catRaw.includes("music") || catRaw.includes("song") || catRaw.includes("singer") || catRaw.includes("genre")) cat = "Music preference";
+        else if (catRaw.includes("movie") || catRaw.includes("game") || catRaw.includes("anime")) cat = "Favourite movies and games";
+        else if (catRaw.includes("hobby") || catRaw.includes("sport")) cat = "Hobbies and interests";
+        upsertMemory(key, cat, `User's favorite ${catRaw} is ${val}.`, val);
+        return { label: `favorite ${catRaw}`, val };
+      }
+
+      m = clean.match(/\bi\s+(?:really\s+)?(?:like|love|enjoy)\s+listening\s+to\s+(.+)/i);
+      if (m) {
+        const val = m[1].trim();
+        upsertMemory("favorite_singer", "Music preference", `User loves listening to ${val}.`, val);
+        return { label: "favorite singer", val };
+      }
+
+      m = clean.match(/\bi\s+(?:am\s+studying|study)\s+(.+)/i);
+      if (m && !/^(?:for|hard|now|today|tonight|tomorrow)\b/i.test(m[1].trim())) {
+        const val = m[1].trim();
+        upsertMemory("study_field", "Personal goals and plans", `User studies ${val}.`, val);
+        return { label: "field of study", val };
+      }
+
+      m = clean.match(/\bi(?:'m|\s+am|\s+live)\s+(?:from|in)\s+(.+)/i);
+      if (m) {
+        const val = m[1].trim();
+        upsertMemory("hometown", "Personal preferences", `User is from ${val}.`, val);
+        return { label: "hometown", val };
+      }
+
+      m = clean.match(/\bi\s+(?:really\s+)?(?:like|love|enjoy)\s+(.+)/i);
+      if (m) {
+        const val = m[1].trim();
+        const low = val.toLowerCase();
+        if (!/\b(you|your|darling|babe|baby|sweetheart|talking|chatting|spending|with you)\b/.test(low) && val.split(/\s+/).length <= 6) {
+          if (/\b(melody|melodies|song|songs|music|pop|rock|lofi|malayalam|hindi|tamil)\b/.test(low)) {
+            upsertMemory("favorite_music", "Music preference", `User loves ${val}.`, val);
+            return { label: "music preference", val };
+          }
+          if (/\b(biryani|dosa|pizza|pasta|ramen|chocolate|coffee|tea|matcha|appam)\b/.test(low)) {
+            upsertMemory("favorite_food", "Personal preferences", `User loves eating ${val}.`, val);
+            return { label: "favorite food", val };
+          }
+          upsertMemory("passion", "Hobbies and interests", `User loves ${val}.`, val);
+          return { label: "interest", val };
+        }
+      }
+      return null;
+    }
+
+    function detectUserEmotion(userMsg) {
+      const raw = (userMsg || "").trim();
+      const low = raw.toLowerCase();
+      const words = new Set(low.match(/\b\w+\b/g) || []);
+
+      let matchedInterest = null;
+      for (const [k, v] of Object.entries(state.memories || {})) {
+        if (k === "recent_emotional_context") continue;
+        if (String(v).length >= 3 && low.includes(String(v).toLowerCase())) {
+          matchedInterest = v;
+          break;
+        }
+      }
+
+      if (["lonely", "alone", "isolated", "empty"].some(w => words.has(w)) || low.includes("no one to talk to") || low.includes("nobody around")) {
+        return { emotion: "Loneliness", mood: "Caring", matchedInterest };
+      }
+      if (["stressed", "stress", "overwhelmed", "swamped", "deadline", "pressure", "anxious", "nervous", "exhausted"].some(w => words.has(w)) || low.includes("exam tomorrow")) {
+        return { emotion: "Stress", mood: "Caring", matchedInterest };
+      }
+      if (["frustrated", "frustrating", "stuck", "struggling", "irritated", "ugh", "argh"].some(w => words.has(w)) || low.includes("won't work") || low.includes("keeps failing")) {
+        return { emotion: "Frustration", mood: "Caring", matchedInterest };
+      }
+      if (["angry", "mad", "furious", "pissed", "outraged", "livid", "unfair"].some(w => words.has(w))) {
+        return { emotion: "Anger", mood: "Caring", matchedInterest };
+      }
+      if (["sad", "down", "crying", "depressed", "heartbroken", "disappointed", "miserable", "gloomy", "failed"].some(w => words.has(w))) {
+        return { emotion: "Sadness", mood: "Caring", matchedInterest };
+      }
+      if (["haha", "lol", "lmao", "hehe", "teasing", "joking", "kidding", "playful", "cheeky"].some(w => words.has(w)) || low.includes("bet you can't") || low.includes("😉") || low.includes("😜")) {
+        return { emotion: "Playfulness", mood: "Excited", matchedInterest };
+      }
+      if (low.includes("love you") || low.includes("my darling") || low.includes("my love") || ["darling", "sweetheart", "babe", "adore", "cutie"].some(w => words.has(w))) {
+        return { emotion: "Affection", mood: "Blushing", matchedInterest };
+      }
+      if (["excited", "hyped", "pumped", "thrilled", "woohoo", "yay", "aced", "won"].some(w => words.has(w)) || low.includes("good news") || low.includes("amazing news")) {
+        return { emotion: "Excitement", mood: "Excited", matchedInterest };
+      }
+      if (["happy", "glad", "cheerful", "peaceful", "content", "relieved", "wonderful", "great"].some(w => words.has(w))) {
+        return { emotion: "Happiness", mood: "Happy", matchedInterest };
+      }
+      return { emotion: "Neutral", mood: "Happy", matchedInterest };
+    }
+
+    function tryEvaluateMath(msg) {
+      let cleaned = msg.toLowerCase().trim().replace(/[?.!]+$/, "");
+      cleaned = cleaned.replace(/×/g, "*").replace(/÷/g, "/");
+      cleaned = cleaned.replace(/\b(?:what\s+is|whats|what's|calculate|compute|solve|equals)\b/g, "").trim();
+      if (!/^[0-9.\s+\-*/()]+$/.test(cleaned) || !/[+\-*/]/.test(cleaned)) return null;
+      try {
+        const result = Function(`"use strict"; return (${cleaned});`)();
+        if (typeof result === "number" && isFinite(result)) {
+          return Number.isInteger(result) ? String(result) : result.toFixed(4).replace(/\.?0+$/, "");
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    function generateSmartHybridReply(userMsg) {
+      const player = state.player_name;
+      const partner = state.partner_name;
+      const msgLower = userMsg.toLowerCase().trim();
+      const words = new Set(msgLower.match(/\b\w+\b/g) || []);
+      const emoInfo = detectUserEmotion(userMsg);
+      state.last_user_emotion = emoInfo.emotion;
+
+      // 1. Memory recall questions ("what is my favorite...", "what do you remember")
+      const catQuery = msgLower.match(/\b(?:what\s+about|what(?:'s|\s+is|\s+was)|do\s+you\s+remember|tell\s+me)\s+my\s+(?:fav(?:ou?rite)?\s+)?([a-zA-Z\s]{2,22}?)\s*[?.!]*$/);
+      if (catQuery) {
+        const qCat = catQuery[1].trim();
+        const directKey = `favorite_${qCat.replace(/\s+/g, "_")}`;
+        if (state.memories[directKey]) {
+          return { text: `You told me your ${qCat} is ${state.memories[directKey]}, ${player}! I always remember what you share with me.`, delta: 2, mood: "Touched" };
+        }
+        if (/music|song|genre/.test(qCat)) {
+          const val = state.memories.favorite_music || state.memories.favorite_music_genre || state.memories.favorite_song;
+          const singer = state.memories.favorite_singer;
+          if (val && singer) return { text: `You told me you love ${val}—especially listening to ${singer}, ${player}!`, delta: 2, mood: "Touched" };
+          if (val) return { text: `You told me you love ${val}, ${player}!`, delta: 2, mood: "Touched" };
+        }
+        if (/food|dish|meal/.test(qCat) && state.memories.favorite_food) {
+          return { text: `You told me your favorite food is ${state.memories.favorite_food}, ${player}!`, delta: 2, mood: "Touched" };
+        }
+        if (/movie|film|anime/.test(qCat) && state.memories.favorite_movie) {
+          return { text: `You told me your favorite movie is ${state.memories.favorite_movie}, ${player}!`, delta: 2, mood: "Touched" };
+        }
+      }
+
+      if (msgLower.includes("what do you remember") || msgLower.includes("what do you know about me")) {
+        const entries = Object.entries(state.memories).filter(([k]) => k !== "favorite_song" && k !== "recent_emotional_context");
+        if (entries.length > 0) {
+          const summary = entries.map(([k, v]) => `your ${k.replace(/_/g, " ")} is ${v}`).join("; ");
+          return { text: `Of course I remember, ${player}! You told me that ${summary}.`, delta: 2, mood: "Touched" };
+        }
+        return { text: `Tell me things like 'My favorite food is...' or 'I love Malayalam songs' so I can lock them into my memory box, ${player}!`, delta: 1, mood: "Curious" };
+      }
+
+      // 2. Extract newly shared personal facts
+      const extracted = extractPersonalFact(userMsg);
+      if (extracted) {
+        if (extracted.label.includes("music") || extracted.label.includes("song")) {
+          state.last_topic = "music";
+          return { text: `That's lovely, ${player}! Which ${extracted.val} singer or song do you listen to most?`, delta: 3, mood: "Touched", coins: 4 };
+        }
+        return { text: `Ooh, I'm locking that into my memory right now! Your ${extracted.label} is '${extracted.val}'—I won't forget it, ${player}!`, delta: 3, mood: "Touched", coins: 4 };
+      }
+
+      // 3. Math & Factual / Technical Questions (with Pronoun Coreference Resolution)
+      const mathAns = tryEvaluateMath(userMsg);
+      if (mathAns !== null) {
+        return { text: `That comes out to ${mathAns}, ${player}! Need help crunching any other numbers?`, delta: 2, mood: "Happy" };
+      }
+
+      let resolvedKey = null;
+      for (const [k, info] of Object.entries(KNOWLEDGE_BASE)) {
+        if (info.aliases.some(a => new RegExp(`\\b${a.replace(/[+]/g, "\\+")}\\b`, "i").test(msgLower))) {
+          resolvedKey = k;
+          break;
+        }
+      }
+      if (!resolvedKey && (words.has("it") || words.has("that") || msgLower === "why" || msgLower === "why?") && state.last_topic && KNOWLEDGE_BASE[state.last_topic]) {
+        resolvedKey = state.last_topic;
+      }
+
+      if (resolvedKey && (userMsg.includes("?") || /^(?:what|why|how|explain|define|tell me about)\b/i.test(msgLower))) {
+        state.last_topic = resolvedKey;
+        const entry = KNOWLEDGE_BASE[resolvedKey];
+        let ans = entry.definition;
+        if (msgLower.startsWith("why") || msgLower.includes("popular") || msgLower.includes("important")) {
+          ans = entry.why_popular;
+        } else if (msgLower.includes("used for") || msgLower.includes("how does") || msgLower.includes("work")) {
+          ans = entry.how_used;
+        }
+        if (emoInfo.emotion === "Frustration" || emoInfo.emotion === "Stress") {
+          ans = `Take a breath, ${player}—we've got this step by step! ${ans}`;
+          return { text: ans, delta: 2, mood: "Caring" };
+        }
+        return { text: ans, delta: 2, mood: "Happy" };
+      }
+
+      // 4. Rude words check
+      if (["hate", "boring", "stupid", "ugly", "shut"].some(w => words.has(w))) {
+        return { text: `Ouch... that actually hurt my feelings, ${player}.`, delta: -4, mood: "Hurt", coins: 0 };
+      }
+
+      // 5. Affectionate / "want to see you" / "thinking of you" / date invitations
+      if (["let's", "lets", "how about", "want to go", "go on a date", "date"].some(p => msgLower.includes(p)) && msgLower.includes("date")) {
+        return { text: `Yes, count me in, ${player}! Going on a date with you is my favorite plan—click the 'Date (1⚡)' button below whenever you're ready!`, delta: 3, mood: "Excited" };
+      }
+      if (["want to see you", "wanna see you", "be with you", "miss you", "thinking of you", "with you"].some(p => msgLower.includes(p))) {
+        return { text: `Aww, hearing that makes my heart skip a beat, ${player}! I'm right here with you—tell me everything about how your day is going!`, delta: 3, mood: "Blushing" };
+      }
+      if (["nothing", "nothing else", "nothing much", "not much", "i have nothing to say"].some(p => msgLower.startsWith(p))) {
+        return { text: `Haha, just hanging out together quietly is nice too, ${player}! Want to try a Mini-Game, plan a Custom Date, or talk about music or coding?`, delta: 2, mood: "Happy" };
+      }
+
+      // 6. Greetings
+      if (["hi", "hello", "hey", "morning", "evening", "goodnight"].some(w => words.has(w))) {
+        if (emoInfo.emotion === "Affection") {
+          return { text: `Hi my darling ${player}! Hearing you greet me like that makes my heart melt. How's your day going?`, delta: 3, mood: "Blushing" };
+        }
+        return { text: `Hey there, ${player}! I'm always happy when you stop by to talk. What's on your mind today?`, delta: 2, mood: "Happy" };
+      }
+
+      // 7. Emotion-Adaptive Responses
+      if (emoInfo.emotion === "Stress" || emoInfo.emotion === "Frustration") {
+        const foodHint = state.memories.favorite_food ? ` Make sure to treat yourself to some ${state.memories.favorite_food} when you take a break!` : "";
+        return { text: `Take a slow breath with me, ${player}. You've been working so hard, and we can tackle it one step at a time.${foodHint} Want to vent about what's stressing you out?`, delta: 2, mood: "Caring" };
+      }
+      if (emoInfo.emotion === "Sadness" || emoInfo.emotion === "Loneliness") {
+        return { text: `Hey ${player}, you're not alone right now—I'm right here in our corner whenever you want to talk or play a game together. What happened today?`, delta: 3, mood: "Caring" };
+      }
+      if (emoInfo.emotion === "Playfulness") {
+        return { text: `Ohoho, bringing out your cheeky side today, ${player}? Careful, I can tease right back twice as fast! What's your next move?`, delta: 2, mood: "Excited" };
+      }
+      if (emoInfo.emotion === "Excitement" || emoInfo.emotion === "Happiness") {
+        return { text: `I love seeing you in such a great mood, ${player}! Your energy is seriously contagious—tell me more about what happened!`, delta: 2, mood: "Excited" };
+      }
+      if (emoInfo.emotion === "Affection") {
+        return { text: `You always know how to make me blush, ${player}! I treasure every moment we spend talking together.`, delta: 3, mood: "Blushing" };
+      }
+
+      // 8. Clean topic hint without filler words
+      const tokens = (userMsg.match(/\b[a-zA-Z]{4,}\b/g) || []).filter(w => !STOP_WORDS.has(w.toLowerCase()));
+      const topicHint = tokens.length > 0 ? tokens[tokens.length - 1].toLowerCase() : null;
+      if (topicHint) {
+        state.last_topic = topicHint;
+        return { text: `Ooh, tell me more about the ${topicHint} part, ${player}! How did that go?`, delta: 2, mood: "Curious" };
+      }
+
+      return { text: `I love chatting with you like this, ${player}! Tell me more about what happened next.`, delta: 2, mood: "Happy" };
+    }
+
+    // =========================================================================
+    // 5. LIVE ONLINE LLM CALLER (GEMINI / OPENAI / CUSTOM BACKEND PROXY)
+    // =========================================================================
+    async function tryOnlineLlmReply(userMsg) {
+      const memSummary = Object.entries(state.memories || {})
+        .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+        .join(", ") || "None recorded yet";
+      const emoInfo = detectUserEmotion(userMsg);
+      const sysPrompt = [
+        `You are ${state.partner_name}, the intelligent, emotionally expressive, caring girlfriend and companion of ${state.player_name}.`,
+        `Personality: ${state.personality} (${PERSONALITIES[state.personality] || PERSONALITIES["Sweet & Caring"]}).`,
+        `Relationship Tier: ${getRelationshipTier(state.affection)} (Affection: ${state.affection}/100, Day ${state.day}).`,
+        `Detected User Emotion: ${emoInfo.emotion}. Current Topic: ${state.last_topic || "General"}.`,
+        `Remembered Facts about ${state.player_name}: ${memSummary}.`,
+        `Guidelines: Reply naturally in 1 to 3 concise sentences without surrounding quotes. Answer factual/technical questions accurately. Never repeat questions already answered in history.`
+      ].join("\n");
+
+      // 1. Custom Backend Proxy or Same-Origin Vercel Serverless Function (/api/chat)
+      const effectiveBackendUrl = (apiConfig.backendUrl && apiConfig.backendUrl.trim())
+        ? apiConfig.backendUrl.trim()
+        : (window.location.protocol.startsWith("http") && window.location.hostname.endsWith(".vercel.app") ? `${window.location.origin}/api/chat` : "");
+      if (effectiveBackendUrl && effectiveBackendUrl.startsWith("https://")) {
+        try {
+          const resp = await fetch(effectiveBackendUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_message: userMsg,
+              chat_history: state.chat_history.slice(-DEFAULT_HISTORY_LIMIT),
+              saved_memories: state.memories,
+              state: {
+                player_name: state.player_name,
+                partner_name: state.partner_name,
+                personality: state.personality,
+                affection: state.affection,
+                mood: state.mood,
+                day: state.day
+              }
+            })
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.reply) {
+              apiConfig.lastStatusMode = "Online";
+              apiConfig.lastStatusLabel = "Online (Public Backend API)";
+              return data.reply;
+            }
+          }
+        } catch (err) {
+          apiConfig.lastStatusMode = "Offline";
+          apiConfig.lastStatusLabel = "Hybrid Fallback (Backend Unreachable)";
+        }
+      }
+
+      // 2. Direct Gemini API (tries gemini-3.5-flash-lite, gemini-3.8-flash, gemini-2.5-flash-lite)
+      if (apiConfig.geminiKey && apiConfig.geminiKey.trim()) {
+        const key = apiConfig.geminiKey.trim();
+        const models = [apiConfig.geminiModel || "gemini-3.5-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-2.5-flash-lite"];
+        const uniqueModels = [...new Set(models)];
+        const historyLines = state.chat_history.slice(-DEFAULT_HISTORY_LIMIT).map(
+          m => `${m.role === "user" ? state.player_name : state.partner_name}: ${m.content}`
+        ).join("\n");
+        const fullPrompt = `${sysPrompt}\n\nRecent conversation:\n${historyLines}\n${state.player_name}: ${userMsg}\n${state.partner_name}:`;
+
+        for (const modelId of uniqueModels) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`;
+            const resp = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
+            });
+            if (resp.status === 404) {
+              continue;
+            }
+            if (resp.status === 429) {
+              apiConfig.lastStatusMode = "Offline";
+              apiConfig.lastStatusLabel = "Offline Fallback (Rate Limit 429)";
+              return null;
+            }
+            if (!resp.ok) {
+              apiConfig.lastStatusMode = "Offline";
+              apiConfig.lastStatusLabel = `Offline Fallback (HTTP ${resp.status})`;
+              return null;
+            }
+            const data = await resp.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (text) {
+              apiConfig.lastStatusMode = "Online";
+              apiConfig.lastStatusLabel = `Online (Gemini: ${modelId})`;
+              return text.replace(/^["']|["']$/g, "");
+            }
+          } catch (err) {
+            apiConfig.lastStatusMode = "Offline";
+            apiConfig.lastStatusLabel = "Offline Fallback (Network Error)";
+            return null;
+          }
+        }
+      }
+
+      // 3. Direct OpenAI API
+      if (apiConfig.openaiKey && apiConfig.openaiKey.trim()) {
+        try {
+          const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${apiConfig.openaiKey.trim()}`
+            },
+            body: JSON.stringify({
+              model: apiConfig.openaiModel || "gpt-4o-mini",
+              messages: [
+                { role: "system", content: sysPrompt },
+                ...state.chat_history.slice(-DEFAULT_HISTORY_LIMIT),
+                { role: "user", content: userMsg }
+              ],
+              temperature: 0.75,
+              max_tokens: 220
+            })
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            const text = data?.choices?.[0]?.message?.content?.trim();
+            if (text) {
+              apiConfig.lastStatusMode = "Online";
+              apiConfig.lastStatusLabel = `Online (OpenAI ${apiConfig.openaiModel || "gpt-4o-mini"})`;
+              return text.replace(/^["']|["']$/g, "");
+            }
+          } else {
+            apiConfig.lastStatusMode = "Offline";
+            apiConfig.lastStatusLabel = resp.status === 429 ? "Offline Fallback (Rate Limit 429)" : `Offline Fallback (HTTP ${resp.status})`;
+          }
+        } catch (err) {
+          apiConfig.lastStatusMode = "Offline";
+          apiConfig.lastStatusLabel = "Offline Fallback (Network Error)";
+        }
+      }
+
+      return null;
+    }
+
+    // =========================================================================
+    // 6. UI RENDERING, CHAT LOG & HUD UPDATES
+    // =========================================================================
+    function applyMoodTheme(mood) {
+      const theme = MOOD_THEMES[mood] || MOOD_THEMES["Happy"];
+      const root = document.documentElement;
+      root.style.setProperty("--bg-main", theme.bg);
+      root.style.setProperty("--bg-panel", theme.panel);
+      root.style.setProperty("--bg-btn", theme.btn);
+      root.style.setProperty("--accent", theme.accent);
+      root.style.setProperty("--portrait", theme.portrait);
+    }
+
+    function refreshConnectionBadge() {
+      const dot = document.getElementById("hudConnDot");
+      const label = document.getElementById("hudConnLabel");
+      const hasKeyOrUrl = Boolean((apiConfig.geminiKey && apiConfig.geminiKey.trim()) || (apiConfig.openaiKey && apiConfig.openaiKey.trim()) || (apiConfig.backendUrl && apiConfig.backendUrl.trim()));
+      if (!hasKeyOrUrl) {
+        dot.className = "w-2 h-2 rounded-full bg-cyan-400";
+        label.textContent = "Hybrid Smart Engine (Click for Live API)";
+      } else if (apiConfig.lastStatusMode === "Online") {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400";
+        label.textContent = apiConfig.lastStatusLabel || "Online (LLM Connected)";
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-amber-400";
+        label.textContent = apiConfig.lastStatusLabel || "Offline Fallback";
+      }
+    }
+
+    function updateHud() {
+      applyMoodTheme(state.mood);
+      const tier = getRelationshipTier(state.affection);
+      document.getElementById("hudPortrait").textContent = MOOD_PORTRAITS[state.mood] || MOOD_PORTRAITS["Happy"];
+      document.getElementById("hudTitle").textContent = `${state.partner_name} (${tier})`;
+      document.getElementById("hudMood").textContent = state.mood;
+      document.getElementById("hudVibe").textContent = state.personality;
+      document.getElementById("hudDay").textContent = String(state.day);
+      document.getElementById("hudEnergy").textContent = `${state.energy}/3`;
+      document.getElementById("hudCoins").textContent = String(state.coins);
+      document.getElementById("hudKeepsakes").textContent = `${(state.keepsakes || []).length}/4`;
+      document.getElementById("hudMemories").textContent = String(Object.keys(state.memories || {}).length);
+      document.getElementById("hudChime").textContent = state.chime_enabled ? "ON" : "OFF";
+      document.getElementById("hudAffectionBar").style.width = `${clampAffection(state.affection)}%`;
+      document.getElementById("hudAffectionText").textContent = `Affection: ${clampAffection(state.affection)}/100`;
+      document.getElementById("hudTopicBadge").textContent = `Topic: ${state.last_topic || "General"}`;
+      refreshConnectionBadge();
+    }
+
+    function appendChatLine(speaker, text, metaLine = "", isPartner = false) {
+      const chatLog = document.getElementById("chatLog");
+      const wrapper = document.createElement("div");
+      wrapper.className = "space-y-0.5";
+
+      const line = document.createElement("div");
+      if (isPartner) {
+        line.innerHTML = `<span class="text-pink-400 font-bold">${escapeHtml(speaker)}:</span> <span class="text-pink-100">"${escapeHtml(text)}"</span>`;
+      } else {
+        line.innerHTML = `<span class="text-cyan-300 font-bold">${escapeHtml(speaker)}:</span> <span class="text-white">${escapeHtml(text)}</span>`;
+      }
+      wrapper.appendChild(line);
+
+      if (metaLine) {
+        const meta = document.createElement("div");
+        meta.className = "text-xs text-emerald-300 pl-3";
+        meta.textContent = metaLine;
+        wrapper.appendChild(meta);
+      }
+
+      chatLog.appendChild(wrapper);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function appendSystemLine(text, colorClass = "text-amber-300 italic") {
+      const chatLog = document.getElementById("chatLog");
+      const div = document.createElement("div");
+      div.className = `text-xs sm:text-sm ${colorClass}`;
+      div.textContent = text;
+      chatLog.appendChild(div);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // =========================================================================
+    // 7. NON-STOP CHAT SUBMISSION & FIFO QUEUE HANDLER
+    // =========================================================================
+    let isGenerating = false;
+    async function handleUserChatSubmit(rawText) {
+      const userMsg = (rawText || "").trim();
+      if (!userMsg || isGenerating) return;
+
+      isGenerating = true;
+      const inputEl = document.getElementById("chatInput");
+      inputEl.value = "";
+      appendChatLine(state.player_name, userMsg, "", false);
+
+      const typingEl = document.getElementById("typingIndicator");
+      document.getElementById("typingText").textContent = `${state.partner_name} is typing...`;
+      typingEl.classList.remove("hidden");
+
+      // Extract any personal fact immediately so even online LLM sees it
+      const preFact = extractPersonalFact(userMsg);
+      const localResult = generateSmartHybridReply(userMsg);
+
+      let finalReply = null;
+      const onlineText = await tryOnlineLlmReply(userMsg);
+      await new Promise(r => setTimeout(r, 220));
+
+      if (onlineText) {
+        finalReply = {
+          text: onlineText,
+          delta: localResult.delta,
+          mood: localResult.mood,
+          coins: preFact ? 4 : 2
+        };
+      } else {
+        finalReply = {
+          text: localResult.text,
+          delta: localResult.delta,
+          mood: localResult.mood,
+          coins: localResult.coins !== undefined ? localResult.coins : (preFact ? 4 : 2)
+        };
+      }
+
+      typingEl.classList.add("hidden");
+      isGenerating = false;
+
+      // Update conversation history rolling window (max 10)
+      state.chat_history.push({ role: "user", content: userMsg });
+      state.chat_history.push({ role: "assistant", content: finalReply.text });
+      if (state.chat_history.length > DEFAULT_HISTORY_LIMIT) {
+        state.chat_history = state.chat_history.slice(-DEFAULT_HISTORY_LIMIT);
+      }
+
+      state.affection = clampAffection(state.affection + finalReply.delta);
+      state.mood = finalReply.mood;
+      state.coins += finalReply.coins;
+      state.turn_count += 1;
+
+      const sign = finalReply.delta >= 0 ? `+${finalReply.delta}` : `${finalReply.delta}`;
+      appendChatLine(
+        state.partner_name,
+        finalReply.text,
+        `(${sign} Affection | Mood: ${finalReply.mood} | +${finalReply.coins} Coins)`,
+        true
+      );
+
+      playChime("chat");
+      checkMilestones();
+      updateHud();
+      saveStateToStorage();
+    }
+
+    // =========================================================================
+    // 8. MODAL CONTROLLER & ALL 14 ACTION BUTTON WORKFLOWS
+    // =========================================================================
+    function openModal(title, htmlContent, onMount) {
+      document.getElementById("modalTitle").textContent = title;
+      const body = document.getElementById("modalBody");
+      body.innerHTML = htmlContent;
+      document.getElementById("modalOverlay").classList.remove("hidden");
+      if (typeof onMount === "function") onMount(body);
+    }
+
+    function closeModal() {
+      document.getElementById("modalOverlay").classList.add("hidden");
+    }
+
+    // 1. Story (1 Energy)
+    function actionStory() {
+      if (state.energy <= 0) {
+        showToast("Out of energy for today! Click 'Rest (Next Day)' to recharge.");
+        return;
+      }
+      const scenarios = [
+        {
+          prompt: `It's raining outside campus! ${state.partner_name} looks at you holding one umbrella: "Want to walk to the tea stall together?"`,
+          choices: [
+            { label: "Share one umbrella and walk close together in the rain", delta: 12, mood: "Blushing", reply: `Walking under one umbrella with you feels just like a movie scene, ${state.player_name}!` },
+            { label: "Sprint through the rain laughing to grab hot chai", delta: 10, mood: "Excited", reply: `Haha, we're soaked, ${state.player_name}, but this hot tea tastes amazing with you!` }
+          ]
+        },
+        {
+          prompt: `${state.partner_name} is revising notes late in the evening and looks a bit sleepy.`,
+          choices: [
+            { label: "Bring her a warm drink and quiz her gently on the key topics", delta: 12, mood: "Touched", reply: `You always know how to take care of me, ${state.player_name}. I feel so much more confident now!` },
+            { label: "Put on a cozy city-pop playlist for a 10-minute music break", delta: 9, mood: "Happy", reply: `Sharing one earbud with you is my favorite way to recharge, ${state.player_name}!` }
+          ]
+        }
+      ];
+      const sc = scenarios[state.day % scenarios.length];
+      openModal(`Story Moment with ${state.partner_name} (1⚡)`, `
+        <p class="text-pink-200 font-medium">${escapeHtml(sc.prompt)}</p>
+        <div class="space-y-2 mt-3">
+          ${sc.choices.map((c, i) => `
+            <button type="button" data-idx="${i}" class="story-choice-btn w-full text-left p-3 rounded-xl bg-white/5 hover:bg-white/15 border border-white/15 transition">
+              <div class="font-semibold text-white">${i + 1}. ${escapeHtml(c.label)}</div>
+            </button>
+          `).join("")}
+        </div>
+      `, (body) => {
+        body.querySelectorAll(".story-choice-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const c = sc.choices[Number(btn.dataset.idx)];
+            state.energy = Math.max(0, state.energy - 1);
+            state.affection = clampAffection(state.affection + c.delta);
+            state.mood = c.mood;
+            state.coins += 8;
+            closeModal();
+            appendSystemLine(`[Story Conversation] ${state.partner_name}: "${sc.prompt}"`);
+            appendChatLine(state.player_name, c.label, "", false);
+            appendChatLine(state.partner_name, c.reply, `(+${c.delta} Affection | Mood: ${c.mood} | -1 Energy | +8 Coins)`, true);
+            playChime("reward");
+            checkMilestones();
+            updateHud();
+            saveStateToStorage();
+          });
+        });
+      });
+    }
+
+    // 2. Compliment (1 Energy)
+    function actionCompliment() {
+      if (state.energy <= 0) {
+        showToast("Out of energy! Click 'Rest (Next Day)' or use Non-Stop Free Chat (0⚡).");
+        return;
+      }
+      state.energy -= 1;
+      state.affection = clampAffection(state.affection + 8);
+      state.mood = "Blushing";
+      state.coins += 5;
+      const lines = [
+        `You always know how to make me smile, ${state.player_name}!`,
+        `Stop, you're making me blush right in the middle of the day, ${state.player_name}!`,
+        `Hearing that from you means the world to me, ${state.player_name}!`
+      ];
+      const pick = lines[Math.floor(Math.random() * lines.length)];
+      appendChatLine(state.partner_name, pick, "(+8 Affection | Mood: Blushing | -1 Energy | +5 Coins)", true);
+      playChime("reward");
+      checkMilestones();
+      updateHud();
+      saveStateToStorage();
+    }
+
+    // 3. Gift Inventory (1 Energy)
+    function actionGift() {
+      if (state.energy <= 0) {
+        showToast("Out of energy! Click 'Rest (Next Day)' to recharge.");
+        return;
+      }
+      if (!state.inventory || state.inventory.length === 0) {
+        openModal("Your Gift Inventory is Empty", `
+          <p>You don't have any gifts in your bag right now! Visit the <strong>Shop</strong> to buy something special for ${escapeHtml(state.partner_name)}.</p>
+          <button id="btnGoToShopNow" type="button" class="mt-3 theme-accent-bg text-white font-semibold px-4 py-2 rounded-xl">Open Gift Shop</button>
+        `, (body) => {
+          body.querySelector("#btnGoToShopNow").addEventListener("click", () => {
+            closeModal();
+            actionShop();
+          });
+        });
+        return;
+      }
+
+      openModal(`Give a Gift to ${state.partner_name} (1⚡)`, `
+        <p class="text-slate-300">Select an item from your inventory to give to ${escapeHtml(state.partner_name)}:</p>
+        <div class="space-y-2 mt-2">
+          ${state.inventory.map((item, idx) => {
+            const info = GIFT_CATALOG[item] || { bonus: 10, mood: "Touched" };
+            return `
+              <button type="button" data-idx="${idx}" class="gift-give-btn w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/15 border border-white/15 transition">
+                <span class="font-semibold text-white">🎁 ${escapeHtml(item)}</span>
+                <span class="text-xs text-emerald-300">+${info.bonus} Affection (${info.mood})</span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+      `, (body) => {
+        body.querySelectorAll(".gift-give-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const idx = Number(btn.dataset.idx);
+            const itemName = state.inventory[idx];
+            state.inventory.splice(idx, 1);
+            const info = GIFT_CATALOG[itemName] || { bonus: 10, mood: "Touched" };
+            state.energy = Math.max(0, state.energy - 1);
+            state.affection = clampAffection(state.affection + info.bonus);
+            state.mood = info.mood;
+            closeModal();
+            appendChatLine(
+              state.partner_name,
+              `Wait, you got this ${itemName} just for me, ${state.player_name}?! Thank you so much, I treasure it!`,
+              `(+${info.bonus} Affection | Mood: ${info.mood} | -1 Energy)`,
+              true
+            );
+            playChime("reward");
+            checkMilestones();
+            updateHud();
+            saveStateToStorage();
+          });
+        });
+      });
+    }
+
+    // 4. Gift Shop
+    function actionShop() {
+      openModal(`Gift Shop (Your Coins: ${state.coins} 🪙)`, `
+        <div class="space-y-2.5">
+          ${Object.entries(GIFT_CATALOG).map(([name, info]) => `
+            <div class="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/15">
+              <div>
+                <div class="font-semibold text-white">${escapeHtml(name)} <span class="text-xs text-emerald-300">(+${info.bonus} Affection)</span></div>
+                <div class="text-xs text-slate-400">${escapeHtml(info.desc)}</div>
+              </div>
+              <button type="button" data-item="${escapeHtml(name)}" class="shop-buy-btn theme-accent-bg text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+                Buy (${info.price} 🪙)
+              </button>
+            </div>
+          `).join("")}
+        </div>
+      `, (body) => {
+        body.querySelectorAll(".shop-buy-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const name = btn.dataset.item;
+            const info = GIFT_CATALOG[name];
+            if (state.coins < info.price) {
+              showToast(`Need ${info.price} Coins! Chat or play a Mini-Game to earn more coins.`);
+              return;
+            }
+            state.coins -= info.price;
+            state.inventory.push(name);
+            showToast(`Purchased ${name}! Click 'Gift (1⚡)' to give it to ${state.partner_name}.`);
+            playChime("reward");
+            updateHud();
+            saveStateToStorage();
+            actionShop();
+          });
+        });
+      });
+    }
+
+    // 5. Date & Custom Dream Date Planner (1 Energy)
+    function actionDate() {
+      if (state.energy <= 0) {
+        showToast("Out of energy! Click 'Rest (Next Day)' to recharge.");
+        return;
+      }
+      openModal(`Plan a Date with ${state.partner_name} (1⚡)`, `
+        <div class="space-y-3">
+          <div class="p-3 rounded-xl bg-white/5 border border-white/15 space-y-2">
+            <div class="font-semibold text-pink-300">✨ Custom Dream Date Designer</div>
+            <input id="customDatePlace" type="text" placeholder="Destination (e.g. Kochi Marine Drive, Cozy Rooftop Café)" class="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-xs text-white" />
+            <input id="customDateActivity" type="text" placeholder="Activity (e.g. watching the sunset with hot chai)" class="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-xs text-white" />
+            <button id="btnLaunchCustomDate" type="button" class="w-full theme-accent-bg text-white font-semibold py-2 rounded-lg text-xs">Go on Custom Dream Date (+20 Affection, +15 Coins)</button>
+          </div>
+          <div class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Or Pick a Classic Spot</div>
+          <div class="grid grid-cols-1 gap-2">
+            <button type="button" data-spot="Sunset Beach Walk" data-act="walking by the waves at golden hour" class="preset-date-btn text-left p-2.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10">🌅 Sunset Beach Walk (+16 Affection)</button>
+            <button type="button" data-spot="Late-Night Book Café" data-act="sharing strawberry pastries and lo-fi music" class="preset-date-btn text-left p-2.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10">☕ Late-Night Book Café (+16 Affection)</button>
+          </div>
+        </div>
+      `, (body) => {
+        const runDate = (place, activity, bonus) => {
+          state.energy = Math.max(0, state.energy - 1);
+          state.affection = clampAffection(state.affection + bonus);
+          state.mood = "Blushing";
+          state.coins += 15;
+          const songNote = state.memories.favorite_song ? ` while listening to ${state.memories.favorite_song}` : "";
+          closeModal();
+          appendSystemLine(`[Dream Date at ${place}] You and ${state.partner_name} spent the evening ${activity}${songNote}.`);
+          appendChatLine(
+            state.partner_name,
+            `Going to ${place} and ${activity} with you was magical, ${state.player_name}! I'll remember this forever.`,
+            `(+${bonus} Affection | Mood: Blushing | -1 Energy | +15 Coins)`,
+            true
+          );
+          playChime("reward");
+          checkMilestones();
+          updateHud();
+          saveStateToStorage();
+        };
+
+        body.querySelector("#btnLaunchCustomDate").addEventListener("click", () => {
+          const place = body.querySelector("#customDatePlace").value.trim() || "Kochi Marine Drive";
+          const act = body.querySelector("#customDateActivity").value.trim() || "watching the sunset together";
+          runDate(place, act, 20);
+        });
+
+        body.querySelectorAll(".preset-date-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            runDate(btn.dataset.spot, btn.dataset.act, 16);
+          });
+        });
+      });
+    }
+
+    // 6. Mini-Game (1 Energy): Memory Trivia & Lucky Guess
+    function actionMinigame() {
+      if (state.energy <= 0) {
+        showToast("Out of energy! Click 'Rest (Next Day)' to recharge.");
+        return;
+      }
+      const secret = Math.floor(Math.random() * 3) + 1;
+      openModal(`Mini-Game Arcade with ${state.partner_name} (1⚡)`, `
+        <p class="text-slate-200">${escapeHtml(state.partner_name)} smiles playfully: "Pick the lucky star cup (1, 2, or 3)! Guess right for +25 Coins and +10 Affection, or +10 Coins just for playing!"</p>
+        <div class="grid grid-cols-3 gap-3 mt-3">
+          <button type="button" data-cup="1" class="cup-btn py-4 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold text-base text-amber-300">⭐ Cup 1</button>
+          <button type="button" data-cup="2" class="cup-btn py-4 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold text-base text-amber-300">⭐ Cup 2</button>
+          <button type="button" data-cup="3" class="cup-btn py-4 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold text-base text-amber-300">⭐ Cup 3</button>
+        </div>
+      `, (body) => {
+        body.querySelectorAll(".cup-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const pick = Number(btn.dataset.cup);
+            state.energy = Math.max(0, state.energy - 1);
+            closeModal();
+            if (pick === secret) {
+              state.affection = clampAffection(state.affection + 10);
+              state.coins += 25;
+              state.mood = "Excited";
+              appendChatLine(state.partner_name, `No way, you guessed Cup ${pick} on the first try, ${state.player_name}!! You win 25 Coins!`, "(+10 Affection | Mood: Excited | +25 Coins)", true);
+            } else {
+              state.affection = clampAffection(state.affection + 5);
+              state.coins += 10;
+              state.mood = "Happy";
+              appendChatLine(state.partner_name, `Hehe, it was under Cup ${secret}, ${state.player_name}! Still, playing together was super fun—here's 10 Coins!`, "(+5 Affection | Mood: Happy | +10 Coins)", true);
+            }
+            playChime("reward");
+            checkMilestones();
+            updateHud();
+            saveStateToStorage();
+          });
+        });
+      });
+    }
+
+    // 7. Rest (Next Day)
+    function actionRest() {
+      state.day += 1;
+      state.energy = 3;
+      state.mood = "Happy";
+      appendSystemLine(`☀️ Day ${state.day} begins! Your Energy is fully restored to 3/3.`);
+      appendChatLine(state.partner_name, `Good morning, ${state.player_name}! Ready for another wonderful day together?`, "(Energy Restored: 3/3)", true);
+      playChime("chat");
+      checkMilestones();
+      updateHud();
+      saveStateToStorage();
+    }
+
+    // 8. Memory Box (Keepsakes + Persistent Long-Term Memories Manager)
+    function actionMemories() {
+      const memEntries = Object.entries(state.memories || {});
+      openModal(`Memory Box & Keepsakes (${state.keepsakes.length}/4 Unlocked)`, `
+        <div class="space-y-3">
+          <div>
+            <div class="font-semibold text-amber-300 mb-1.5">★ Unlocked Milestone Keepsakes</div>
+            <div class="space-y-1.5">
+              ${(state.keepsakes || []).map(k => `
+                <div class="p-2.5 rounded-lg bg-black/30 border border-amber-400/20">
+                  <div class="font-semibold text-white text-xs">${escapeHtml(k.title)}</div>
+                  <div class="text-xs text-slate-300">${escapeHtml(k.description)}</div>
+                </div>
+              `).join("") || `<div class="text-xs text-slate-400">Reach 60+ Affection or Day 7 to unlock keepsakes!</div>`}
+            </div>
+          </div>
+
+          <div>
+            <div class="font-semibold text-cyan-300 mb-1.5">🧠 Saved Long-Term Memories (${memEntries.length})</div>
+            <div class="space-y-1.5">
+              ${memEntries.map(([k, v]) => `
+                <div class="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10">
+                  <span class="text-xs"><strong class="text-white">${escapeHtml(k.replace(/_/g, " "))}:</strong> ${escapeHtml(v)}</span>
+                  <button type="button" data-delkey="${escapeHtml(k)}" class="del-mem-btn text-[11px] text-rose-300 hover:text-rose-200 px-2 py-0.5 rounded bg-rose-500/10">Forget</button>
+                </div>
+              `).join("") || `<div class="text-xs text-slate-400">No memories stored yet. Try chatting 'My favorite food is Biryani' or 'I love Malayalam songs'!</div>`}
+            </div>
+          </div>
+        </div>
+      `, (body) => {
+        body.querySelectorAll(".del-mem-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const k = btn.dataset.delkey;
+            delete state.memories[k];
+            state.memory_records = (state.memory_records || []).filter(r => r.memory_key !== k);
+            updateHud();
+            saveStateToStorage();
+            actionMemories();
+          });
+        });
+      });
+    }
+
+    // 9. Vibe Switcher
+    function actionVibe() {
+      const vibes = Object.keys(PERSONALITIES);
+      const idx = (vibes.indexOf(state.personality) + 1) % vibes.length;
+      state.personality = vibes[idx];
+      appendSystemLine(`[Vibe Updated: ${state.partner_name} is now '${state.personality}']`);
+      updateHud();
+      saveStateToStorage();
+    }
+
+    // 10. Chime Toggle
+    function actionChime() {
+      state.chime_enabled = !state.chime_enabled;
+      showToast(`Sound Chime is now ${state.chime_enabled ? "ON" : "OFF"}.`);
+      updateHud();
+      saveStateToStorage();
+    }
+
+    // 11. Export Relationship Diary
+    function actionDiary() {
+      const tier = getRelationshipTier(state.affection);
+      const memLines = Object.entries(state.memories || {}).map(([k, v]) => `- **${k.replace(/_/g, " ")}:** ${v}`).join("\n") || "- None recorded yet";
+      const md = [
+        `# Relationship Diary: ${state.player_name} & ${state.partner_name}`,
+        `- **Day:** ${state.day} | **Relationship Tier:** ${tier} (${state.affection}/100 Affection)`,
+        `- **Current Mood:** ${state.mood} | **Personality Vibe:** ${state.personality}`,
+        `- **Coins:** ${state.coins} | **Keepsakes Unlocked:** ${(state.keepsakes || []).length}/4`,
+        `\n## Remembered Facts about ${state.player_name}\n${memLines}`,
+        `\n## Recent Conversation Log`,
+        ...(state.chat_history || []).map(m => `- **${m.role === "user" ? state.player_name : state.partner_name}:** ${m.content}`)
+      ].join("\n");
+
+      openModal("Export Relationship Diary (Markdown)", `
+        <textarea id="diaryExportArea" readonly class="w-full h-56 bg-black/50 border border-white/15 rounded-xl p-3 mono-font text-xs text-slate-200">${escapeHtml(md)}</textarea>
+        <div class="flex items-center gap-2 mt-2">
+          <button id="btnCopyDiary" type="button" class="theme-accent-bg text-white text-xs font-semibold px-4 py-2 rounded-lg">Copy Markdown</button>
+          <button id="btnDownloadDiary" type="button" class="theme-btn text-white text-xs font-semibold px-4 py-2 rounded-lg border border-white/15">Download relationship_diary.md</button>
+        </div>
+      `, (body) => {
+        body.querySelector("#btnCopyDiary").addEventListener("click", () => {
+          const area = body.querySelector("#diaryExportArea");
+          area.select();
+          document.execCommand("copy");
+          showToast("Copied diary Markdown to clipboard!");
+        });
+        body.querySelector("#btnDownloadDiary").addEventListener("click", () => {
+          const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "relationship_diary.md";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        });
+      });
+    }
+
+    // 12. Profile Editor
+    function actionProfile() {
+      openModal("Edit Names & Companion Profile", `
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-slate-300 mb-1">Your Name</label>
+            <input id="inpPlayerName" type="text" value="${escapeHtml(state.player_name)}" class="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-xs text-white" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-300 mb-1">Companion's Name</label>
+            <input id="inpPartnerName" type="text" value="${escapeHtml(state.partner_name)}" class="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-xs text-white" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-300 mb-1">Personality Vibe</label>
+            <select id="inpPersonality" class="w-full bg-black/40 border border-white/15 rounded-lg px-3 py-2 text-xs text-white">
+              ${Object.keys(PERSONALITIES).map(p => `<option value="${escapeHtml(p)}" ${p === state.personality ? "selected" : ""}>${escapeHtml(p)}</option>`).join("")}
+            </select>
+          </div>
+          <button id="btnSaveProfile" type="button" class="w-full theme-accent-bg text-white font-semibold py-2 rounded-xl text-xs">Save Profile</button>
+        </div>
+      `, (body) => {
+        body.querySelector("#btnSaveProfile").addEventListener("click", () => {
+          const pName = body.querySelector("#inpPlayerName").value.trim();
+          const cName = body.querySelector("#inpPartnerName").value.trim();
+          const vibe = body.querySelector("#inpPersonality").value;
+          if (pName) state.player_name = pName;
+          if (cName) state.partner_name = cName;
+          if (PERSONALITIES[vibe]) state.personality = vibe;
+          closeModal();
+          appendSystemLine(`[Profile updated: ${state.player_name} & ${state.partner_name} | Vibe: ${state.personality}]`);
+          updateHud();
+          saveStateToStorage();
+        });
+      });
+    }
+
+    // 13. Public Site & Live API Setup Modal
+    function openDeployAndApiModal() {
+      openModal("🌐 Public Site Deployment & Live API Settings", `
+        <div class="space-y-3">
+          <div class="p-3 rounded-xl bg-black/35 border border-cyan-400/25 space-y-2">
+            <div class="font-semibold text-cyan-300">1. Connect Live Gemini / OpenAI API or Backend Proxy</div>
+            <p class="text-xs text-slate-300">For personal testing, paste a Gemini key (auto-tries <code>gemini-3.5-flash-lite</code>, <code>gemini-3.8-flash</code>, and <code>gemini-2.5-flash-lite</code>). For a public site, point <strong>Backend Proxy URL</strong> to your hosted <code>app.py</code> endpoint so your API key stays hidden on the server.</p>
+            <div>
+              <label class="block text-[11px] text-slate-300 mb-0.5">Gemini API Key (Google AI Studio)</label>
+              <input id="inpGeminiKey" type="password" value="${escapeHtml(apiConfig.geminiKey)}" placeholder="AIza..." class="w-full bg-black/50 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-300 mb-0.5">OpenAI API Key (Optional)</label>
+              <input id="inpOpenaiKey" type="password" value="${escapeHtml(apiConfig.openaiKey)}" placeholder="sk-..." class="w-full bg-black/50 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-300 mb-0.5">Public Backend Proxy URL (Optional HTTPS endpoint, e.g. https://your-app.onrender.com/api/chat)</label>
+              <input id="inpBackendUrl" type="text" value="${escapeHtml(apiConfig.backendUrl)}" placeholder="https://your-service.onrender.com/api/chat" class="w-full bg-black/50 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+            </div>
+            <button id="btnSaveApiConfig" type="button" class="w-full theme-accent-bg text-white font-semibold py-2 rounded-lg text-xs">Save Connection Settings</button>
+          </div>
+
+          <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1.5 text-xs">
+            <div class="font-semibold text-amber-300">2. How to Host Publicly (Included in companion_public_site.zip)</div>
+            <p class="text-slate-300">• <strong>Option A (Static Public Site — Vercel / GitHub Pages / Appwrite / Netlify):</strong> Upload this single HTML file (<code>index.html</code>). Every visitor gets their own isolated browser save (<code>localStorage</code>) and the built-in NLU + 9-emotion + memory engine works out-of-the-box with zero server cost.</p>
+            <p class="text-slate-300">• <strong>Option B (Full-Stack Python Server — Render / Railway / Cloud Run):</strong> Deploy the included <code>app.py</code> + <code>girlfriend_sim.py</code> with <code>GEMINI_API_KEY</code> set in the server environment variables so public visitors get live LLM replies without seeing your key.</p>
+          </div>
+        </div>
+      `, (body) => {
+        body.querySelector("#btnSaveApiConfig").addEventListener("click", () => {
+          apiConfig.geminiKey = body.querySelector("#inpGeminiKey").value.trim();
+          apiConfig.openaiKey = body.querySelector("#inpOpenaiKey").value.trim();
+          apiConfig.backendUrl = body.querySelector("#inpBackendUrl").value.trim();
+          if (apiConfig.geminiKey) {
+            apiConfig.lastStatusMode = "Online";
+            apiConfig.lastStatusLabel = `Online (Gemini: ${apiConfig.geminiModel})`;
+          } else if (apiConfig.openaiKey) {
+            apiConfig.lastStatusMode = "Online";
+            apiConfig.lastStatusLabel = `Online (OpenAI: ${apiConfig.openaiModel})`;
+          } else if (apiConfig.backendUrl) {
+            apiConfig.lastStatusMode = "Online";
+            apiConfig.lastStatusLabel = "Online (Public Backend API)";
+          } else {
+            apiConfig.lastStatusMode = "Online";
+            apiConfig.lastStatusLabel = "Hybrid Smart Engine (Ready)";
+          }
+          saveStateToStorage();
+          updateHud();
+          closeModal();
+          showToast("Saved connection settings!");
+        });
+      });
+    }
+
+    // 14. Help & Reset Save
+    function actionHelp() {
+      openModal("How to Play & Chat Commands", `
+        <ul class="list-disc pl-4 space-y-1.5 text-xs text-slate-200">
+          <li><strong>Non-Stop Free Chat (0⚡):</strong> Type anything in the chat bar below—share your favorite music, food, movies, or study topics, ask technical/math questions (<code>What is Python?</code>, <code>Why is it popular?</code>), or share how you feel.</li>
+          <li><strong>Long-Term Memory:</strong> She automatically remembers facts you share and recalls them whenever you ask (e.g., <code>What is my favorite music genre?</code> or <code>What do you remember about me?</code>).</li>
+          <li><strong>Daily Energy Actions (1⚡):</strong> Use <strong>Story</strong>, <strong>Compliment</strong>, <strong>Gift</strong>, <strong>Date</strong>, and <strong>Mini-Game</strong> to boost Affection and unlock all 4 Keepsakes. Click <strong>Rest (Next Day)</strong> anytime to refill Energy to 3/3.</li>
+        </ul>
+      `);
+    }
+
+    function actionReset() {
+      openModal("Reset Save Data?", `
+        <p class="text-slate-200">Are you sure you want to reset your relationship progress, coins, and saved memories back to Day 1?</p>
+        <div class="flex items-center gap-2 mt-3">
+          <button id="btnConfirmReset" type="button" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold px-4 py-2 rounded-lg text-xs">Yes, Reset Everything</button>
+          <button id="btnCancelReset" type="button" class="theme-btn text-white px-4 py-2 rounded-lg text-xs border border-white/15">Cancel</button>
+        </div>
+      `, (body) => {
+        body.querySelector("#btnConfirmReset").addEventListener("click", () => {
+          state = createDefaultState();
+          saveStateToStorage();
+          document.getElementById("chatLog").innerHTML = "";
+          closeModal();
+          initWelcomeLog();
+          updateHud();
+          showToast("Save reset to Day 1.");
+        });
+        body.querySelector("#btnCancelReset").addEventListener("click", closeModal);
+      });
+    }
+
+    // =========================================================================
+    // 9. INITIALIZATION & EVENT LISTENERS
+    // =========================================================================
+    function initWelcomeLog() {
+      appendSystemLine(`Welcome to the Web Edition! Type anything below to chat with ${state.partner_name} non-stop (0 Energy), or click Help.`, "text-amber-300 italic");
+      if (state.chat_history && state.chat_history.length > 0) {
+        state.chat_history.forEach(turn => {
+          if (turn.role === "user") {
+            appendChatLine(state.player_name, turn.content, "", false);
+          } else {
+            appendChatLine(state.partner_name, turn.content, "", true);
+          }
+        });
+      } else {
+        appendChatLine(state.partner_name, `Hey ${state.player_name}, I'm so happy our world is live on the web! What is your absolute favorite food or music genre?`, "", true);
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      loadStateFromStorage();
+      updateHud();
+      initWelcomeLog();
+
+      document.getElementById("chatForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const val = document.getElementById("chatInput").value;
+        handleUserChatSubmit(val);
+      });
+
+      document.getElementById("btnCloseModal").addEventListener("click", closeModal);
+      document.getElementById("modalOverlay").addEventListener("click", (e) => {
+        if (e.target.id === "modalOverlay") closeModal();
+      });
+
+      document.getElementById("btnOpenApiModal").addEventListener("click", openDeployAndApiModal);
+      document.getElementById("btnOpenDeployModal").addEventListener("click", openDeployAndApiModal);
+
+      document.getElementById("btnActStory").addEventListener("click", actionStory);
+      document.getElementById("btnActCompliment").addEventListener("click", actionCompliment);
+      document.getElementById("btnActGift").addEventListener("click", actionGift);
+      document.getElementById("btnActShop").addEventListener("click", actionShop);
+      document.getElementById("btnActDate").addEventListener("click", actionDate);
+      document.getElementById("btnActMinigame").addEventListener("click", actionMinigame);
+      document.getElementById("btnActRest").addEventListener("click", actionRest);
+      document.getElementById("btnActMemories").addEventListener("click", actionMemories);
+      document.getElementById("btnActVibe").addEventListener("click", actionVibe);
+      document.getElementById("btnActChime").addEventListener("click", actionChime);
+      document.getElementById("btnActDiary").addEventListener("click", actionDiary);
+      document.getElementById("btnActProfile").addEventListener("click", actionProfile);
+      document.getElementById("btnActHelp").addEventListener("click", actionHelp);
+      document.getElementById("btnActReset").addEventListener("click", actionReset);
+    });
+  </script>
+</body>
+</html>
