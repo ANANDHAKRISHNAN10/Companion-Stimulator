@@ -792,12 +792,12 @@
       ].join("\n");
 
       // 1. Custom Backend Proxy or Same-Origin Vercel Serverless Function (/api/chat)
-      const effectiveBackendUrl = (apiConfig.backendUrl && apiConfig.backendUrl.trim())
+      const autoBackendUrl = (apiConfig.backendUrl && apiConfig.backendUrl.trim())
         ? apiConfig.backendUrl.trim()
-        : (window.location.protocol.startsWith("http") && window.location.hostname.endsWith(".vercel.app") ? `${window.location.origin}/api/chat` : "");
-      if (effectiveBackendUrl && effectiveBackendUrl.startsWith("https://")) {
+        : (window.location.protocol.startsWith("http") ? `${window.location.origin}/api/chat` : "");
+      if (autoBackendUrl && autoBackendUrl.startsWith("http")) {
         try {
-          const resp = await fetch(effectiveBackendUrl, {
+          const resp = await fetch(autoBackendUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
