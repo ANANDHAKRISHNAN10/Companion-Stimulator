@@ -9,6 +9,9 @@ from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import girlfriend_sim as sim
+sim.MEMORY_DB_FILE = "/tmp/companion_memories.db"
+sim.SAVE_FILE = "/tmp/partner_save.json"
+sim.DIARY_FILE = "/tmp/relationship_diary.md"
 
 
 class handler(BaseHTTPRequestHandler):
