@@ -322,6 +322,7 @@
     // =========================================================================
     function createDefaultState() {
       return {
+    session_id: (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : ("sess_" + Date.now() + "_" + Math.random().toString(36).slice(2)),
         player_name: "sasuke",
         partner_name: "sakura",
         personality: "Sweet & Caring",
@@ -801,6 +802,7 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+          session_id: state.session_id,
               user_message: userMsg,
               chat_history: state.chat_history.slice(-DEFAULT_HISTORY_LIMIT),
               saved_memories: state.memories,
@@ -932,10 +934,10 @@
       const dot = document.getElementById("hudConnDot");
       const label = document.getElementById("hudConnLabel");
       const hasKeyOrUrl = Boolean((apiConfig.geminiKey && apiConfig.geminiKey.trim()) || (apiConfig.openaiKey && apiConfig.openaiKey.trim()) || (apiConfig.backendUrl && apiConfig.backendUrl.trim()));
-      if (!hasKeyOrUrl) {
+      if (!hasKeyOrUrl && apiConfig.lastStatusLabel !== "Online (Public Backend API)") {
         dot.className = "w-2 h-2 rounded-full bg-cyan-400";
         label.textContent = "Hybrid Smart Engine (Click for Live API)";
-      } else if (apiConfig.lastStatusMode === "Online") {
+      } else if (apiConfig.lastStatusMode === "Online" || apiConfig.lastStatusLabel === "Online (Public Backend API)") {
         dot.className = "w-2 h-2 rounded-full bg-emerald-400";
         label.textContent = apiConfig.lastStatusLabel || "Online (LLM Connected)";
       } else {
